@@ -68,10 +68,11 @@ const theme = createTheme({
   palette: {
     neutral: { main: grey[500] },
     success: { main: '#2e7d32' }, // verde    -> en movimiento (iconos de categoria)
-    driving: { main: '#1565c0' }, // azul     -> conduciendo (flecha)
+    driving: { main: '#1565c0' }, // azul     -> conduciendo      (io184=3)
+    working: { main: '#fb8c00' }, // naranja  -> trabajando       (io184=2)
+    resting: { main: '#2e7d32' }, // verde    -> descansando/disponible (io184=0/1)
     warning: { main: '#f9a825' }, // amarillo -> parado con contacto
     error: { main: '#c62828' }, // rojo     -> apagado
-    working: { main: '#fb8c00' }, // naranja  -> trabajando (io184=2)
   },
 });
 export default async () => {
@@ -86,7 +87,7 @@ export default async () => {
     square: { icon: await loadImage(squareSvg), ratio: 0.82 },
   };
   Object.entries(markerShapes).forEach(([shape, { icon, ratio }]) => {
-    ['driving', 'warning', 'error', 'working', 'neutral'].forEach((color) => {
+    ['driving', 'working', 'resting', 'warning', 'error', 'neutral'].forEach((color) => {
       mapImages[`marker-${shape}-${color}`] = prepareIcon(
         markerBackground,
         icon,

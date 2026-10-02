@@ -8,18 +8,32 @@ import { mapIconKey } from './core/preloadImages';
 import { useAttributePreference } from '../common/util/preferences';
 import { useCatchCallback } from '../reactHelper';
 import { findFonts, fromMapCoordinates, toMapCoordinates } from './core/mapUtil';
-// Forma y color del marcador segun el estado del vehiculo:
-//   flecha azul       -> conduciendo (en movimiento), rota segun el rumbo
-//   cuadrado naranja  -> trabajando (Driver 1 Working State io184 = 2)
-//   cuadrado amarillo -> parado con contacto puesto
-//   cuadrado rojo     -> apagado
-// Ajusta las claves si tu equipo envia atributos distintos (ver notas).
+// Estado de actividad del conductor (io184, Driver 1 Working State):
+//   0 = Descansando, 1 = Disponible, 2 = Trabajando, 3 = Conduciendo
+// El marcador se decide solo con io184. NO se usa el atributo motion: estos
+// equipos lo reportan como true incluso con el camion parado y descansando.
+//   flecha azul      -> conduciendo, rota segun el rumbo
+//   cuadrado naranja -> trabajando
+//   cuadrado verde   -> descansando o disponible
+//   cuadrado gris    -> sin io184 (equipo sin tacografo o sin tarjeta)
 const motionMarker = (position) => {
-  const a = position.attributes || {};
-  if (Number(a.io184) === 2) return { shape: 'square', color: 'working' };
-  if (a.motion === true) return { shape: 'arrow', color: 'driving' };
-  if (a.ignition === true) return { shape: 'square', color: 'warning' };
-  return { shape: 'square', color: 'error' };
+  const state = position.attributes?.io184;
+  // Sin el atributo no se afirma nada del estado. Se comprueba aparte porque
+  // Number(null) es 0, que se confundiria con "Descansando".
+  if (state === undefined || state === null || state === '') {
+    return { shape: 'square', color: 'neutral' };
+  }
+  switch (Number(state)) {
+    case 3:
+      return { shape: 'arrow', color: 'driving' };
+    case 2:
+      return { shape: 'square', color: 'working' };
+    case 1:
+    case 0:
+      return { shape: 'square', color: 'resting' };
+    default:
+      return { shape: 'square', color: 'neutral' };
+  }
 };
 const MapPositions = ({
   positions,

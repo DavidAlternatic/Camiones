@@ -124,19 +124,6 @@
       .tp-val.red   { color:#dc2626; }
       .tp-val.blue  { color:#2563eb; }
 
-      /* Barras */
-      .tp-bars { padding: 8px 14px 11px; border-bottom:1px solid #e6e8ef; }
-      .tp-bar-row {
-        display:flex; justify-content:space-between;
-        font-size:12px; color:#64748b; margin-bottom:4px; margin-top:8px;
-      }
-      .tp-bar-row:first-child { margin-top:0; }
-      .tp-track { height:6px; background:#e6e8ef; border-radius:3px; overflow:hidden; }
-      .tp-fill  { height:100%; border-radius:3px; transition:width .5s ease; }
-      .tp-fill.green { background:#16a34a; }
-      .tp-fill.amber { background:#d97706; }
-      .tp-fill.red   { background:#dc2626; }
-
       /* Footer */
       .tp-foot {
         padding: 8px 14px;
@@ -202,9 +189,7 @@
         #tacho-popup.visible { display: flex; }
 
         /* Ocultar lo que sobra en pantalla pequeña */
-        #tp-row-alt,
-        #tp-row-dist,
-        #tacho-popup .tp-bars { display: none; }
+        #tp-row-alt { display: none; }
 
         /* Zona scrollable. min-height:0 es imprescindible:
            sin él un hijo flex no encoge y el overflow nunca se activa. */
@@ -274,8 +259,12 @@
         <div class="tp-section">
           <div class="tp-sec-lbl">Posición</div>
           <div class="tp-row">
-            <span class="tp-lbl">Hora ajustada</span>
+            <span class="tp-lbl">Última actualización</span>
             <span class="tp-val" id="tp-fixtime">—</span>
+          </div>
+          <div class="tp-row">
+            <span class="tp-lbl">Hora inicio ruta</span>
+            <span class="tp-val" id="tp-start">—</span>
           </div>
           <div class="tp-row">
             <span class="tp-lbl">Velocidad</span>
@@ -284,10 +273,6 @@
           <div class="tp-row" id="tp-row-alt">
             <span class="tp-lbl">Altitud</span>
             <span class="tp-val" id="tp-alt">—</span>
-          </div>
-          <div class="tp-row" id="tp-row-dist">
-            <span class="tp-lbl">Distancia total</span>
-            <span class="tp-val" id="tp-dist">—</span>
           </div>
           <div class="tp-row">
             <span class="tp-lbl">Dirección</span>
@@ -299,42 +284,20 @@
         <div class="tp-section">
           <div class="tp-sec-lbl">Tacógrafo · CE 561/2006</div>
           <div class="tp-row">
-            <span class="tp-lbl">Restante hasta pausa</span>
-            <span class="tp-val" id="tp-rem">—</span>
+            <span class="tp-lbl">Tiempo conducido hoy</span>
+            <span class="tp-val" id="tp-drive-today">—</span>
           </div>
           <div class="tp-row">
-            <span class="tp-lbl">Conducción continua</span>
-            <span class="tp-val" id="tp-cont">—</span>
+            <span class="tp-lbl">Tiempo descansado hoy</span>
+            <span class="tp-val" id="tp-rest-today">—</span>
           </div>
           <div class="tp-row">
-            <span class="tp-lbl">Pausa mínima</span>
-            <span class="tp-val" id="tp-brk">—</span>
+            <span class="tp-lbl">Tiempo carga/descarga hoy</span>
+            <span class="tp-val" id="tp-work-today">—</span>
           </div>
           <div class="tp-row">
             <span class="tp-lbl">Conducción semanal</span>
-            <span class="tp-val" id="tp-daily">—</span>
-          </div>
-          <div class="tp-row">
-            <span class="tp-lbl">Restante semanal</span>
-            <span class="tp-val" id="tp-rest">—</span>
-          </div>
-        </div>
-
-        <!-- Barras (ocultas en móvil) -->
-        <div class="tp-bars">
-          <div class="tp-bar-row">
-            <span>Restante hasta pausa</span>
-            <span id="tp-rem-pct">—</span>
-          </div>
-          <div class="tp-track">
-            <div class="tp-fill green" id="tp-rem-bar" style="width:0%"></div>
-          </div>
-          <div class="tp-bar-row">
-            <span>Conducción continua</span>
-            <span id="tp-cont-pct">—</span>
-          </div>
-          <div class="tp-track">
-            <div class="tp-fill green" id="tp-cont-bar" style="width:0%"></div>
+            <span class="tp-val" id="tp-drive-week">—</span>
           </div>
         </div>
 
@@ -386,7 +349,6 @@
 
 
       // ── Helpers ────────────────────────────────────────────────
-      const isPhone = () => window.matchMedia('(max-width: 600px)').matches;
 
       function fmt(s) {
         if (s == null || isNaN(s)) return '—';
@@ -402,11 +364,13 @@
       function actKey(v)   { return ['rest','available','work','driving'][v] ?? 'nocard'; }
       function light(r)    { return r == null ? '' : r <= 0 ? 'red' : r < 3600 ? 'amber' : 'green'; }
       function clight(c)   { return c == null ? '' : c > 16200 ? 'red' : c > 14400 ? 'amber' : 'green'; }
-      function pct(v, max) { return v != null ? Math.min(100, Math.round(v/max*100)) : 0; }
       function initials(n) { return n ? n.trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase() : '?'; }
       function fmtTime(iso) {
         if (!iso) return '—';
         return new Date(iso).toLocaleString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      }
+      function fmtHour(ms) {
+        return ms != null ? new Date(ms).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}) : '—';
       }
 
       // ── Interceptar WebSocket ──────────────────────────────────
@@ -420,6 +384,7 @@
             if (msg.positions) msg.positions.forEach(p => {
               T.positions[p.deviceId]  = p.attributes ?? {};
               T.posData[p.deviceId]    = p;
+              appendHistory(p);
               if (T.selectedId === p.deviceId) updatePopup(p.deviceId);
             });
           } catch(_) {}
@@ -512,6 +477,94 @@
         return id || null;
       }
 
+      // ── Histórico de estados del tacógrafo ─────────────────────
+      // Los tiempos de hoy y de la semana se calculan a partir de los
+      // cambios de io184. Se piden las posiciones desde el lunes 00:00
+      // una vez por camión y día, y después se van añadiendo las que
+      // llegan en tiempo real por WebSocket. Solo guardamos {t, s}.
+      T.hist = {};   // deviceId -> { week, loading, ok, pts:[{t, s}] }
+
+      function startOfToday() {
+        const d = new Date(); d.setHours(0,0,0,0); return d.getTime();
+      }
+      function startOfWeek() {
+        const d = new Date(); d.setHours(0,0,0,0);
+        d.setDate(d.getDate() - ((d.getDay() + 6) % 7));   // lunes
+        return d.getTime();
+      }
+      function toPoint(p) {
+        const s = p.attributes?.[IO.workState];
+        return { t: new Date(p.fixTime).getTime(), s: s != null ? Number(s) : null };
+      }
+
+      function appendHistory(p) {
+        const h = T.hist[p.deviceId];
+        if (!h?.pts) return;
+        const pt = toPoint(p);
+        const last = h.pts[h.pts.length - 1];
+        if (pt.s != null && (!last || pt.t > last.t)) h.pts.push(pt);
+      }
+
+      async function loadHistory(id) {
+        const day = startOfToday();
+        const h = T.hist[id];
+        if (h && (h.loading || (h.ok && h.day === day))) return;
+        if (h?.failedAt && Date.now() - h.failedAt < 60000) return;
+        T.hist[id] = { day, loading: true, ok: false, pts: [] };
+        try {
+          const from = new Date(startOfWeek()).toISOString();
+          const to   = new Date().toISOString();
+          const r = await fetch(`/api/positions?deviceId=${id}&from=${from}&to=${to}`,
+            { credentials:'include', headers:{ Accept:'application/json' } });
+          if (!r.ok) throw new Error();
+          const pts = (await r.json()).map(toPoint).filter(p => p.s != null);
+          // Posiciones en vivo que llegaron mientras descargábamos
+          const lastT = pts.length ? pts[pts.length - 1].t : 0;
+          T.hist[id].pts.forEach(p => { if (p.t > lastT) pts.push(p); });
+          T.hist[id] = { day, loading: false, ok: true, pts };
+        } catch (_) {
+          // Sin histórico: se reintenta pasado un minuto
+          T.hist[id] = { failedAt: Date.now() };
+        }
+        if (T.selectedId === id) updatePopup(id);
+      }
+
+      // Cada posición mantiene su estado hasta la siguiente (la última,
+      // hasta ahora). Se suma el tiempo de cada tramo que cae en la ventana.
+      function tachoStats(pts) {
+        const now = Date.now(), day = startOfToday(), week = startOfWeek();
+        const overlap = (a, b, from) => Math.max(0, b - Math.max(a, from));
+        const r = { driveToday: 0, restToday: 0, workToday: 0, driveWeek: 0, routeStart: null };
+        let droveToday = false, restFrom = null;
+        for (let i = 0; i < pts.length; i++) {
+          const { t, s } = pts[i];
+          const end  = i + 1 < pts.length ? pts[i + 1].t : now;
+          const prev = i > 0 ? pts[i - 1].s : null;
+          if (end <= week) continue;
+
+          if (s === 3 && end > day) {
+            // Inicio de ruta: primera vez hoy que pasa a Conduciendo
+            if (r.routeStart == null && t >= day && prev !== 3) r.routeStart = t;
+            droveToday = true;
+          }
+          // El descanso de la jornada cuenta desde la primera vez que
+          // pasa a Descansando después de haber conducido hoy
+          if (s === 0 && droveToday && restFrom == null) restFrom = Math.max(t, day);
+
+          if (s === 3) {
+            r.driveWeek  += overlap(t, end, week);
+            r.driveToday += overlap(t, end, day);
+          } else if (s === 2) {
+            r.workToday  += overlap(t, end, day);
+          } else if (s === 0 && restFrom != null) {
+            r.restToday  += overlap(t, end, restFrom);
+          }
+        }
+        // ms -> s (fmt() espera segundos)
+        r.driveToday /= 1000; r.restToday /= 1000; r.workToday /= 1000; r.driveWeek /= 1000;
+        return r;
+      }
+
       // ── Abrir y actualizar popup ───────────────────────────────
       function openPopup(id) {
         T.selectedId  = id;
@@ -531,9 +584,6 @@
         const act   = io(attrs, IO.workState);
         const cont  = min(io(attrs, IO.contDriveMin));
         const rem   = min(io(attrs, IO.remTodayMin));
-        const daily = min(io(attrs, IO.dailyMin));
-        const rest  = min(io(attrs, IO.restMin));
-        const nbrk  = min(io(attrs, IO.nextBreakMin));
         const cardPresent = (io(attrs, IO.cardPresent) ?? 0) > 0;
         const duid  = decodeDriverId(attrs[IO.driverMsb], attrs[IO.driverLsb]);
         const drv   = duid ? T.drivers[duid] : null;
@@ -542,7 +592,6 @@
         // Posición
         const speed = pos.speed != null ? Math.round(pos.speed * 1.852) : null;
         const alt   = pos.altitude  ?? null;
-        const dist  = attrs.totalDistance ?? null;
         const lat   = pos.latitude  ?? null;
         const lon   = pos.longitude ?? null;
 
@@ -587,7 +636,6 @@
         set('tp-fixtime', fmtTime(pos.fixTime));
         set('tp-speed',   speed != null ? `${speed} km/h` : '—');
         set('tp-alt',     alt   != null ? `${Math.round(alt)} m` : '—');
-        set('tp-dist',    dist  != null ? `${(dist/1000).toFixed(2)} Km` : '—');
 
         // Dirección: geocodificación inversa de Traccar, cacheada por
         // coordenadas redondeadas (~100 m) para no repetir peticiones.
@@ -604,18 +652,22 @@
           set('tp-addr', '—');
         }
 
-        // ── Tacógrafo ──
-        setVal('tp-rem',   fmt(rem),   light(rem));
-        setVal('tp-cont',  fmt(cont),  clight(cont));
-        setVal('tp-brk',   fmt(nbrk),  '');
-        // Conducción semanal: ámbar >50h, rojo >56h (límite CE)
-        setVal('tp-daily', fmt(daily), daily != null ? (daily > 201600 ? 'red' : daily > 180000 ? 'amber' : '') : '');
-        setVal('tp-rest',  fmt(rest),  '');
-
-        // ── Barras (ocultas en móvil, no gastamos ciclos) ──
-        if (!isPhone()) {
-          bar('tp-rem-bar',  'tp-rem-pct',  pct(rem,  16200), light(rem));
-          bar('tp-cont-bar', 'tp-cont-pct', pct(cont, 16200), clight(cont));
+        // ── Tiempos del día / semana (desde el histórico de io184) ──
+        loadHistory(id);
+        const h = T.hist[id];
+        if (h?.ok) {
+          const st = tachoStats(h.pts);
+          set('tp-start', fmtHour(st.routeStart));
+          setVal('tp-drive-today', fmt(st.driveToday), '');
+          setVal('tp-rest-today',  fmt(st.restToday),  '');
+          setVal('tp-work-today',  fmt(st.workToday),  '');
+          // Conducción semanal: ámbar >50h, rojo >56h (límite CE)
+          const w = st.driveWeek;
+          setVal('tp-drive-week', fmt(w), w > 201600 ? 'red' : w > 180000 ? 'amber' : '');
+        } else {
+          const txt = h?.loading ? 'Cargando…' : '—';
+          ['tp-start','tp-drive-today','tp-rest-today','tp-work-today','tp-drive-week']
+            .forEach(k => setVal(k, txt, ''));
         }
 
         // ── Footer ──
@@ -638,12 +690,6 @@
         if (!el) return;
         el.textContent = val ?? '—';
         el.className   = `tp-val ${cls ?? ''}`.trim();
-      }
-      function bar(barId, pctId, value, cls) {
-        const b = document.getElementById(barId);
-        const p = document.getElementById(pctId);
-        if (b) { b.style.width = value + '%'; b.className = `tp-fill ${cls || 'green'}`; }
-        if (p) p.textContent = value + '%';
       }
 
       // Geocodificación inversa vía Traccar (/api/server/geocode devuelve
