@@ -1,8 +1,10 @@
 import { grey } from '@mui/material/colors';
 import { createTheme } from '@mui/material';
 import { loadImage, prepareIcon } from './mapUtil';
-
 import directionSvg from '../../resources/images/direction.svg';
+import arrowSvg from '../../resources/images/arrow.svg';
+import squareSvg from '../../resources/images/square.svg';
+import arrowBackgroundSvg from '../../resources/images/arrow-background.svg';
 import backgroundSvg from '../../resources/images/background.svg';
 import animalSvg from '../../resources/images/icon/animal.svg';
 import bicycleSvg from '../../resources/images/icon/bicycle.svg';
@@ -26,7 +28,6 @@ import trainSvg from '../../resources/images/icon/train.svg';
 import tramSvg from '../../resources/images/icon/tram.svg';
 import truckSvg from '../../resources/images/icon/truck.svg';
 import vanSvg from '../../resources/images/icon/van.svg';
-
 export const mapIcons = {
   animal: animalSvg,
   bicycle: bicycleSvg,
@@ -51,7 +52,6 @@ export const mapIcons = {
   truck: truckSvg,
   van: vanSvg,
 };
-
 export const mapIconKey = (category) => {
   switch (category) {
     case 'offroad':
@@ -63,23 +63,42 @@ export const mapIconKey = (category) => {
       return mapIcons.hasOwnProperty(category) ? category : 'default';
   }
 };
-
 export const mapImages = {};
-
 const theme = createTheme({
   palette: {
     neutral: { main: grey[500] },
+    success: { main: '#2e7d32' }, // verde    -> en movimiento (iconos de categoria)
+    driving: { main: '#1565c0' }, // azul     -> conduciendo (flecha)
+    warning: { main: '#f9a825' }, // amarillo -> parado con contacto
+    error: { main: '#c62828' }, // rojo     -> apagado
+    working: { main: '#fb8c00' }, // naranja  -> trabajando (io184=2)
   },
 });
-
 export default async () => {
   const background = await loadImage(backgroundSvg);
   mapImages.background = await prepareIcon(background);
   mapImages.direction = await prepareIcon(await loadImage(directionSvg));
+  // Marcadores de estado: flecha (conduciendo) o cuadrado (parado/trabajando)
+  // sobre el mismo circulo blanco. El fondo NO se tine, solo la forma interior.
+  const markerBackground = await loadImage(arrowBackgroundSvg);
+  const markerShapes = {
+    arrow: { icon: await loadImage(arrowSvg), ratio: 0.82 },
+    square: { icon: await loadImage(squareSvg), ratio: 0.82 },
+  };
+  Object.entries(markerShapes).forEach(([shape, { icon, ratio }]) => {
+    ['driving', 'warning', 'error', 'working', 'neutral'].forEach((color) => {
+      mapImages[`marker-${shape}-${color}`] = prepareIcon(
+        markerBackground,
+        icon,
+        theme.palette[color].main,
+        ratio,
+      );
+    });
+  });
   await Promise.all(
     Object.keys(mapIcons).map(async (category) => {
       const results = [];
-      ['info', 'success', 'error', 'neutral'].forEach((color) => {
+      ['info', 'success', 'error', 'warning', 'neutral'].forEach((color) => {
         results.push(
           loadImage(mapIcons[category]).then((icon) => {
             mapImages[`${category}-${color}`] = prepareIcon(

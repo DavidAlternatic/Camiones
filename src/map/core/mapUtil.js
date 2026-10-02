@@ -2,7 +2,6 @@ import { parse, stringify } from 'wellknown';
 import turfCircle from '@turf/circle';
 import gcoord from 'gcoord';
 import { map } from './MapView';
-
 const coordinateSystem = (id) => {
   switch (id) {
     case 'gcj02':
@@ -11,38 +10,31 @@ const coordinateSystem = (id) => {
       return gcoord.WGS84;
   }
 };
-
 export const toMapCoordinates = (longitude, latitude) =>
   map.coordinateSystem
     ? gcoord.transform([longitude, latitude], gcoord.WGS84, coordinateSystem(map.coordinateSystem))
     : [longitude, latitude];
-
 export const fromMapCoordinates = (longitude, latitude) =>
   map.coordinateSystem
     ? gcoord.transform([longitude, latitude], coordinateSystem(map.coordinateSystem), gcoord.WGS84)
     : [longitude, latitude];
-
 const transformGeometry = (geometry, from, to) => ({
   ...geometry,
   coordinates: gcoord.transform(structuredClone(geometry.coordinates), from, to),
 });
-
 export const loadImage = (url) =>
   new Promise((imageLoaded) => {
     const image = new Image();
     image.onload = () => imageLoaded(image);
     image.src = url;
   });
-
 const canvasTintImage = (image, color) => {
   const canvas = document.createElement('canvas');
   canvas.width = image.width * devicePixelRatio;
   canvas.height = image.height * devicePixelRatio;
   canvas.style.width = `${image.width}px`;
   canvas.style.height = `${image.height}px`;
-
   const context = canvas.getContext('2d');
-
   context.save();
   context.fillStyle = color;
   context.globalAlpha = 1;
@@ -51,22 +43,19 @@ const canvasTintImage = (image, color) => {
   context.globalAlpha = 1;
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
   context.restore();
-
   return canvas;
 };
-
-export const prepareIcon = (background, icon, color) => {
+// iconRatio: tamano del icono respecto al fondo (0.5 por defecto). Un valor
+// mayor hace el icono mas grande dentro del fondo (usado para la flecha).
+export const prepareIcon = (background, icon, color, iconRatio = 0.5) => {
   const canvas = document.createElement('canvas');
   canvas.width = background.width * devicePixelRatio;
   canvas.height = background.height * devicePixelRatio;
   canvas.style.width = `${background.width}px`;
   canvas.style.height = `${background.height}px`;
-
   const context = canvas.getContext('2d');
   context.drawImage(background, 0, 0, canvas.width, canvas.height);
-
   if (icon) {
-    const iconRatio = 0.5;
     const imageWidth = canvas.width * iconRatio;
     const imageHeight = canvas.height * iconRatio;
     context.drawImage(
@@ -77,10 +66,8 @@ export const prepareIcon = (background, icon, color) => {
       imageHeight,
     );
   }
-
   return context.getImageData(0, 0, canvas.width, canvas.height);
 };
-
 export const reverseCoordinates = (it) => {
   if (!it) {
     return it;
@@ -96,7 +83,6 @@ export const reverseCoordinates = (it) => {
     coordinates: reverseCoordinates(it.coordinates),
   };
 };
-
 export const geofenceToFeature = (theme, item) => {
   let geometry;
   if (item.area.indexOf('CIRCLE') > -1) {
@@ -129,14 +115,12 @@ export const geofenceToFeature = (theme, item) => {
     },
   };
 };
-
 export const geometryToArea = (geometry) => {
   const normalized = map.coordinateSystem
     ? transformGeometry(geometry, coordinateSystem(map.coordinateSystem), gcoord.WGS84)
     : geometry;
   return stringify(reverseCoordinates(normalized));
 };
-
 export const findFonts = (map) => {
   const { glyphs } = map.getStyle();
   if (glyphs.startsWith('https://tiles.openfreemap.org')) {

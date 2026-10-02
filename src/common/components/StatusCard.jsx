@@ -18,6 +18,8 @@ import {
   TableFooter,
   Link,
   Tooltip,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import { makeStyles } from 'tss-react/mui';
 import CloseIcon from '@mui/icons-material/Close';
@@ -61,6 +63,13 @@ const useStyles = makeStyles()((theme, { desktopPadding }) => ({
     paddingBottom: theme.spacing(1),
     maxHeight: theme.dimensions.cardContentMaxHeight,
     overflow: 'auto',
+    [theme.breakpoints.down('md')]: {
+      paddingTop: theme.spacing(0.5),
+      paddingBottom: theme.spacing(0.5),
+      '&:last-child': {
+        paddingBottom: theme.spacing(0.5),
+      },
+    },
   },
   icon: {
     width: '25px',
@@ -116,8 +125,13 @@ const StatusRow = ({ name, content }) => {
   );
 };
 
+// Keys hidden from the status card on small screens to keep the popup compact
+const compactHiddenKeys = ['altitude', 'totalDistance'];
+
 const StatusCard = ({ deviceId, position, onClose, disableActions, desktopPadding = 0 }) => {
   const { classes } = useStyles({ desktopPadding });
+  const theme = useTheme();
+  const smallScreen = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const t = useTranslation();
@@ -205,6 +219,7 @@ const StatusCard = ({ deviceId, position, onClose, disableActions, desktopPaddin
                           (key) =>
                             position.hasOwnProperty(key) || position.attributes.hasOwnProperty(key),
                         )
+                        .filter((key) => !(smallScreen && compactHiddenKeys.includes(key)))
                         .map((key) => (
                           <StatusRow
                             key={key}

@@ -3,12 +3,24 @@ import { useSelector } from 'react-redux';
 import { useMediaQuery } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { map } from './core/MapView';
-import { formatTime, getStatusColor } from '../common/util/formatter';
+import { formatTime } from '../common/util/formatter';
 import { mapIconKey } from './core/preloadImages';
 import { useAttributePreference } from '../common/util/preferences';
 import { useCatchCallback } from '../reactHelper';
 import { findFonts, fromMapCoordinates, toMapCoordinates } from './core/mapUtil';
-
+// Forma y color del marcador segun el estado del vehiculo:
+//   flecha azul       -> conduciendo (en movimiento), rota segun el rumbo
+//   cuadrado naranja  -> trabajando (Driver 1 Working State io184 = 2)
+//   cuadrado amarillo -> parado con contacto puesto
+//   cuadrado rojo     -> apagado
+// Ajusta las claves si tu equipo envia atributos distintos (ver notas).
+const motionMarker = (position) => {
+  const a = position.attributes || {};
+  if (Number(a.io184) === 2) return { shape: 'square', color: 'working' };
+  if (a.motion === true) return { shape: 'arrow', color: 'driving' };
+  if (a.ignition === true) return { shape: 'square', color: 'warning' };
+  return { shape: 'square', color: 'error' };
+};
 const MapPositions = ({
   positions,
   onMapClick,
@@ -21,20 +33,15 @@ const MapPositions = ({
   const id = useId();
   const clusters = `${id}-clusters`;
   const selected = `${id}-selected`;
-
   const theme = useTheme();
   const desktop = useMediaQuery(theme.breakpoints.up('md'));
   const iconScale = useAttributePreference('iconScale', desktop ? 0.75 : 1);
-
   const devices = useSelector((state) => state.devices.items);
   const selectedDeviceId = useSelector((state) => state.devices.selectedId);
-
   const mapCluster = useAttributePreference('mapCluster', true);
   const directionType = useAttributePreference('mapDirection', 'selected');
-
   const disabledRef = useRef(disabled);
   disabledRef.current = disabled;
-
   const createFeature = useCallback(
     (devices, position, selectedPositionId) => {
       const device = devices[position.deviceId];
@@ -50,23 +57,23 @@ const MapPositions = ({
           showDirection = selectedPositionId === position.id && position.course > 0;
           break;
       }
+      const marker = showStatus ? motionMarker(position) : { shape: 'square', color: 'neutral' };
       return {
         id: position.id,
         deviceId: position.deviceId,
         name: device.name,
         fixTime: formatTime(position.fixTime, 'seconds'),
         category: mapIconKey(device.category),
-        color: showStatus ? position.attributes.color || getStatusColor(device.status) : 'neutral',
-        rotation: position.course,
+        marker: `marker-${marker.shape}-${marker.color}`,
+        // Solo la flecha rota; el cuadrado se mantiene siempre recto.
+        rotation: marker.shape === 'arrow' ? position.course : 0,
         direction: showDirection,
       };
     },
     [directionType, showStatus],
   );
-
   const onMouseEnter = () => (map.getCanvas().style.cursor = 'pointer');
   const onMouseLeave = () => (map.getCanvas().style.cursor = '');
-
   const onMapClickCallback = useCallback(
     (event) => {
       if (!event.defaultPrevented && onMapClick) {
@@ -76,7 +83,6 @@ const MapPositions = ({
     },
     [onMapClick],
   );
-
   const onMarkerClickCallback = useCallback(
     (event) => {
       if (disabledRef.current) return;
@@ -88,7 +94,6 @@ const MapPositions = ({
     },
     [onMarkerClick],
   );
-
   const onClusterClick = useCatchCallback(
     async (event) => {
       if (disabledRef.current) return;
@@ -105,7 +110,6 @@ const MapPositions = ({
     },
     [clusters, id],
   );
-
   useEffect(() => {
     map.addSource(id, {
       type: 'geojson',
@@ -131,9 +135,12 @@ const MapPositions = ({
         source,
         filter: ['!has', 'point_count'],
         layout: {
-          'icon-image': '{category}-{color}',
+          // El marcador de estado (flecha o cuadrado) es el icono principal.
+          'icon-image': ['get', 'marker'],
           'icon-size': iconScale,
           'icon-allow-overlap': true,
+          'icon-rotate': ['get', 'rotation'],
+          'icon-rotation-alignment': 'map',
           'text-field': `{${titleField || 'name'}}`,
           'text-allow-overlap': true,
           'text-anchor': 'bottom',
@@ -147,20 +154,6 @@ const MapPositions = ({
           'text-halo-width': 1,
         },
       });
-      map.addLayer({
-        id: `direction-${source}`,
-        type: 'symbol',
-        source,
-        filter: ['all', ['!has', 'point_count'], ['==', 'direction', true]],
-        layout: {
-          'icon-image': 'direction',
-          'icon-size': iconScale,
-          'icon-allow-overlap': true,
-          'icon-rotate': ['get', 'rotation'],
-          'icon-rotation-alignment': 'map',
-        },
-      });
-
       map.on('mouseenter', source, onMouseEnter);
       map.on('mouseleave', source, onMouseLeave);
       map.on('click', source, onMarkerClickCallback);
@@ -178,32 +171,24 @@ const MapPositions = ({
         'text-size': 14,
       },
     });
-
     map.on('mouseenter', clusters, onMouseEnter);
     map.on('mouseleave', clusters, onMouseLeave);
     map.on('click', clusters, onClusterClick);
     map.on('click', onMapClickCallback);
-
     return () => {
       map.off('mouseenter', clusters, onMouseEnter);
       map.off('mouseleave', clusters, onMouseLeave);
       map.off('click', clusters, onClusterClick);
       map.off('click', onMapClickCallback);
-
       if (map.getLayer(clusters)) {
         map.removeLayer(clusters);
       }
-
       [id, selected].forEach((source) => {
         map.off('mouseenter', source, onMouseEnter);
         map.off('mouseleave', source, onMouseLeave);
         map.off('click', source, onMarkerClickCallback);
-
         if (map.getLayer(source)) {
           map.removeLayer(source);
-        }
-        if (map.getLayer(`direction-${source}`)) {
-          map.removeLayer(`direction-${source}`);
         }
         if (map.getSource(source)) {
           map.removeSource(source);
@@ -221,7 +206,6 @@ const MapPositions = ({
     selected,
     titleField,
   ]);
-
   useEffect(() => {
     [id, selected].forEach((source) => {
       map.getSource(source)?.setData({
@@ -254,8 +238,6 @@ const MapPositions = ({
     selected,
     selectedDeviceId,
   ]);
-
   return null;
 };
-
 export default MapPositions;
